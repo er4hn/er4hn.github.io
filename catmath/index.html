@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Math Cat Runner</title>
     <style>
         :root {
@@ -28,12 +28,16 @@
             font-family: 'Comic Sans MS', 'Chalkboard SE', 'Arial Rounded MT Bold', sans-serif;
             background-color: var(--sky);
             user-select: none;
+            /* Height fallback for older browsers */
+            height: 100vh;
+            /* Modern dynamic height to account for mobile toolbars */
+            height: 100dvh;
         }
 
         #game-container {
             position: relative;
             width: 100vw;
-            height: 100vh;
+            height: 100%;
             display: flex;
             flex-direction: column;
         }
@@ -41,14 +45,16 @@
         /* --- World Rendering --- */
         #world {
             position: relative;
-            height: 100%;
+            flex: 1; /* Take up all available space */
             background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 100%);
             overflow: hidden;
-            transition: height 0.5s ease;
+            transition: flex 0.5s ease;
+            min-height: 0; /* Important for flex shrink behavior */
         }
 
+        /* When solving, limit the world height to leave space for the panel */
         #world.solving {
-            height: 45%;
+            flex: 0 0 40%;
         }
 
         .ground {
@@ -133,6 +139,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 15px;
+            padding-top: calc(15px + env(safe-area-inset-top, 0px));
             z-index: 50;
             pointer-events: none;
         }
@@ -160,35 +167,38 @@
 
         #math-panel {
             position: relative;
-            height: 55%;
+            flex: 1; /* Take up the rest of the space when visible */
             width: 100%;
             background: var(--ui-bg);
             border-top: 8px solid var(--primary);
-            display: none;
+            display: none; /* Toggled in JS */
             flex-direction: column;
             align-items: center;
             padding: 10px;
+            /* Ensure buttons don't hit the bottom of the screen or home bar */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 10px));
             z-index: 100;
             box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+            min-height: 0;
         }
 
         #question-display {
-            font-size: clamp(32px, 8vw, 48px);
+            font-size: clamp(28px, 6vw, 44px);
             margin: 5px 0;
             color: var(--text);
             font-weight: bold;
         }
 
         #answer-display {
-            font-size: 32px;
+            font-size: 28px;
             background: #f0f0f0;
-            width: 160px;
-            height: 55px;
+            width: 140px;
+            height: 50px;
             border-radius: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             border: 3px solid #ddd;
             color: var(--primary);
         }
@@ -196,18 +206,18 @@
         .numpad {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            gap: clamp(6px, 2vw, 10px);
             width: 100%;
             max-width: 380px;
             flex-grow: 1;
-            padding-bottom: 10px;
+            min-height: 0;
         }
 
         .key {
             background: #fff;
             border: none;
             border-radius: 12px;
-            font-size: 24px;
+            font-size: clamp(20px, 5vw, 26px);
             font-weight: bold;
             color: var(--text);
             box-shadow: 0 5px 0 #ccc;
@@ -299,6 +309,7 @@
         </div>
     </div>
 
+    <!-- Start Screen -->
     <div id="start-overlay" class="overlay">
         <div class="modal">
             <h1 style="font-size: 40px; margin: 0; color: var(--primary);">Math Cat!</h1>
@@ -308,6 +319,7 @@
         </div>
     </div>
 
+    <!-- Settings Screen -->
     <div id="settings-overlay" class="overlay hidden">
         <div class="modal">
             <h2>Game Settings</h2>
@@ -331,7 +343,7 @@
         input: "",
         speed: 4,
         spawnTimer: null,
-        history: [] // Added memory of previous questions
+        history: []
     };
 
     let settings = { ops: ['+','-'], max: 10 };
@@ -363,7 +375,7 @@
         state.paused = false;
         state.input = "";
         state.currentObstacle = null;
-        state.history = []; // Clear history on reset
+        state.history = [];
         answerEl.innerText = "";
         mathPanel.style.display = 'none';
         world.classList.remove('solving');
@@ -460,18 +472,13 @@
     function generateProblem() {
         let prob;
         let attempts = 0;
-        const maxAttempts = 15; // Don't try forever if the pool is small
-
-        // Try to generate a non-repeat question
+        const maxAttempts = 15;
         do {
             prob = createSingleProblem();
             attempts++;
         } while (state.history.includes(prob.text) && attempts < maxAttempts);
-
-        // Record history
         state.history.push(prob.text);
-        if (state.history.length > 15) state.history.shift(); // Keep history size reasonable
-
+        if (state.history.length > 15) state.history.shift();
         return prob;
     }
 
