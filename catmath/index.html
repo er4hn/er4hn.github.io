@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Cat Runner</title>
+    <style>
+        :root {
+            --sky: #87CEEB;
+            --grass: #5ab55e;
+            --grass-dark: #3d8a41;
+            --ui-bg: rgba(255, 255, 255, 0.98);
+            --primary: #FF9800;
+            --success: #4CAF50;
+            --error: #F44336;
+            --text: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Arial Rounded MT Bold', sans-serif;
+            background-color: var(--sky);
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- World Rendering --- */
+        #world {
+            position: relative;
+            height: 100%;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 100%);
+            overflow: hidden;
+            transition: height 0.5s ease;
+        }
+
+        #world.solving {
+            height: 45%;
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background-color: var(--grass);
+            border-top: 6px solid var(--grass-dark);
+            z-index: 2;
+        }
+
+        .grass-tuft {
+            position: absolute;
+            bottom: 10px;
+            color: var(--grass-dark);
+            font-size: 20px;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        #cat {
+            position: absolute;
+            font-size: clamp(70px, 18vw, 110px);
+            bottom: 60px;
+            left: 10%;
+            z-index: 10;
+            transition: bottom 1.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                        transform 1s ease,
+                        left 1s ease;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1));
+        }
+
+        .cloud {
+            position: absolute;
+            font-size: 60px;
+            color: white;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .bird {
+            position: absolute;
+            font-size: 30px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .obstacle {
+            position: absolute;
+            bottom: 60px;
+            right: -200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .obstacle-icon {
+            font-size: clamp(60px, 15vw, 90px);
+        }
+
+        .op-badge {
+            background: white;
+            padding: 4px 15px;
+            border-radius: 15px;
+            font-size: 22px;
+            font-weight: bold;
+            border: 3px solid var(--text);
+            margin-bottom: 5px;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+        }
+
+        /* --- UI Layers --- */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .score-card {
+            background: white;
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            pointer-events: auto;
+        }
+
+        #settings-btn {
+            background: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            pointer-events: auto;
+        }
+
+        #math-panel {
+            position: relative;
+            height: 55%;
+            width: 100%;
+            background: var(--ui-bg);
+            border-top: 8px solid var(--primary);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            z-index: 100;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+        }
+
+        #question-display {
+            font-size: clamp(32px, 8vw, 48px);
+            margin: 5px 0;
+            color: var(--text);
+            font-weight: bold;
+        }
+
+        #answer-display {
+            font-size: 32px;
+            background: #f0f0f0;
+            width: 160px;
+            height: 55px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+            border: 3px solid #ddd;
+            color: var(--primary);
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 380px;
+            flex-grow: 1;
+            padding-bottom: 10px;
+        }
+
+        .key {
+            background: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text);
+            box-shadow: 0 5px 0 #ccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .key:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #ccc;
+        }
+
+        .key-del { background: #ffebee; color: var(--error); box-shadow: 0 5px 0 #ef9a9a; }
+        .key-go { background: var(--success); color: white; box-shadow: 0 5px 0 #388E3C; grid-column: span 2; }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal {
+            background: white;
+            width: 90%;
+            max-width: 400px;
+            padding: 25px;
+            border-radius: 30px;
+            text-align: center;
+        }
+
+        .start-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 6px 0 #E65100;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 18px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div class="score-card">⭐ Stars: <span id="score-val">0</span></div>
+        <button id="settings-btn" onclick="toggleSettings(true)">⚙️</button>
+    </div>
+
+    <div id="world">
+        <div class="ground"></div>
+        <div id="cat">🐱</div>
+    </div>
+
+    <div id="math-panel">
+        <div id="question-display">?</div>
+        <div id="answer-display"></div>
+        <div class="numpad">
+            <button class="key" onclick="press(1)">1</button>
+            <button class="key" onclick="press(2)">2</button>
+            <button class="key" onclick="press(3)">3</button>
+            <button class="key" onclick="press(4)">4</button>
+            <button class="key" onclick="press(5)">5</button>
+            <button class="key" onclick="press(6)">6</button>
+            <button class="key" onclick="press(7)">7</button>
+            <button class="key" onclick="press(8)">8</button>
+            <button class="key" onclick="press(9)">9</button>
+            <button class="key key-del" onclick="backspace()">⌫</button>
+            <button class="key" onclick="press(0)">0</button>
+            <button class="key key-go" onclick="submit()">GO!</button>
+        </div>
+    </div>
+
+    <div id="start-overlay" class="overlay">
+        <div class="modal">
+            <h1 style="font-size: 40px; margin: 0; color: var(--primary);">Math Cat!</h1>
+            <p style="font-size: 18px; color: #666;">Solve math to help the cat run!</p>
+            <div style="font-size: 70px; margin: 15px;">☁️ 🐦 🏃🐱 🌿</div>
+            <button class="start-btn" onclick="startGame()">Play Now!</button>
+        </div>
+    </div>
+
+    <div id="settings-overlay" class="overlay hidden">
+        <div class="modal">
+            <h2>Game Settings</h2>
+            <div class="setting-row"><span>Addition (+)</span><input type="checkbox" id="check-add" checked style="width:25px;height:25px;"></div>
+            <div class="setting-row"><span>Subtraction (-)</span><input type="checkbox" id="check-sub" checked style="width:25px;height:25px;"></div>
+            <div class="setting-row"><span>Multiplication (×)</span><input type="checkbox" id="check-mul" style="width:25px;height:25px;"></div>
+            <div class="setting-row"><span>Division (÷)</span><input type="checkbox" id="check-div" style="width:25px;height:25px;"></div>
+            <div class="setting-row"><span>Hardest Number:</span><input type="number" id="setting-max" value="10" min="5" max="100" style="width: 60px; font-size: 18px;"></div>
+            <button class="start-btn" style="font-size: 20px;" onclick="saveAndReset()">Save & Restart</button>
+            <p style="margin-top: 15px; cursor: pointer; color: #999;" onclick="toggleSettings(false)">Cancel</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    let state = {
+        running: false,
+        paused: false,
+        score: 0,
+        currentObstacle: null,
+        input: "",
+        speed: 4,
+        spawnTimer: null,
+        history: [] // Added memory of previous questions
+    };
+
+    let settings = { ops: ['+','-'], max: 10 };
+
+    const cat = document.getElementById('cat');
+    const world = document.getElementById('world');
+    const mathPanel = document.getElementById('math-panel');
+    const questionEl = document.getElementById('question-display');
+    const answerEl = document.getElementById('answer-display');
+    const scoreVal = document.getElementById('score-val');
+
+    function startGame() {
+        document.getElementById('start-overlay').classList.add('hidden');
+        resetGame();
+        state.running = true;
+        
+        for(let i=0; i<3; i++) spawnDecoration('cloud', true);
+        for(let i=0; i<6; i++) spawnDecoration('grass', true);
+        
+        gameLoop();
+        state.spawnTimer = setTimeout(spawnObstacle, 2000);
+    }
+
+    function resetGame() {
+        if (state.spawnTimer) clearTimeout(state.spawnTimer);
+        
+        state.score = 0;
+        scoreVal.innerText = "0";
+        state.paused = false;
+        state.input = "";
+        state.currentObstacle = null;
+        state.history = []; // Clear history on reset
+        answerEl.innerText = "";
+        mathPanel.style.display = 'none';
+        world.classList.remove('solving');
+        
+        cat.style.bottom = '60px';
+        cat.style.transform = 'scale(1)';
+        cat.style.left = '10%';
+        cat.innerText = '🐱';
+        
+        document.querySelectorAll('.obstacle, .cloud, .bird, .grass-tuft').forEach(o => o.remove());
+        
+        settings.ops = [];
+        if(document.getElementById('check-add').checked) settings.ops.push('+');
+        if(document.getElementById('check-sub').checked) settings.ops.push('-');
+        if(document.getElementById('check-mul').checked) settings.ops.push('*');
+        if(document.getElementById('check-div').checked) settings.ops.push('/');
+        if(settings.ops.length === 0) settings.ops = ['+'];
+        settings.max = parseInt(document.getElementById('setting-max').value) || 10;
+    }
+
+    function spawnDecoration(type, randomInit = false) {
+        const el = document.createElement('div');
+        let x = randomInit ? Math.random() * window.innerWidth : window.innerWidth + 100;
+        
+        if (type === 'cloud') {
+            el.className = 'cloud';
+            el.innerText = '☁️';
+            el.style.top = (Math.random() * 150 + 20) + 'px';
+            el.dataset.speed = (Math.random() * 0.5 + 0.3);
+            el.style.fontSize = (Math.random() * 40 + 40) + 'px';
+        } else if (type === 'bird') {
+            el.className = 'bird';
+            el.innerText = '🐦';
+            el.style.top = (Math.random() * 100 + 50) + 'px';
+            el.dataset.speed = (Math.random() * 1.5 + 1);
+        } else if (type === 'grass') {
+            el.className = 'grass-tuft';
+            el.innerText = Math.random() > 0.5 ? '🌿' : '🌱';
+            el.dataset.speed = state.speed;
+            el.style.bottom = (Math.random() * 15 + 5) + 'px';
+        }
+
+        el.style.left = x + 'px';
+        world.appendChild(el);
+    }
+
+    function gameLoop() {
+        if (!state.running) return;
+
+        if (!state.paused) {
+            document.querySelectorAll('.cloud, .bird, .grass-tuft').forEach(el => {
+                let left = parseFloat(el.style.left);
+                let speed = parseFloat(el.dataset.speed);
+                if (left < -150) {
+                    el.remove();
+                } else {
+                    el.style.left = (left - speed) + 'px';
+                }
+            });
+
+            if (Math.random() < 0.005) spawnDecoration('cloud');
+            if (Math.random() < 0.003) spawnDecoration('bird');
+            if (Math.random() < 0.05) spawnDecoration('grass');
+
+            const obs = state.currentObstacle;
+            if (obs) {
+                let currentRight = parseFloat(obs.style.right);
+                const stopX = window.innerWidth * 0.65;
+                if (currentRight < stopX) {
+                    obs.style.right = (currentRight + state.speed) + 'px';
+                } else if (!obs.dataset.triggered) {
+                    triggerProblem(obs);
+                }
+            }
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    function spawnObstacle() {
+        if (!state.running) return;
+        const obs = document.createElement('div');
+        obs.className = 'obstacle';
+        obs.style.right = '-200px';
+        const problem = generateProblem();
+        obs.dataset.ans = problem.ans;
+        obs.dataset.q = problem.text;
+        obs.dataset.type = problem.type;
+        let icon = "🚧"; if (problem.type === '-') icon = "🪵"; if (problem.type === '*') icon = "🪜"; if (problem.type === '/') icon = "🛝"; 
+        obs.innerHTML = `<div class="op-badge">${problem.type === '*' ? '×' : (problem.type === '/' ? '÷' : problem.type)}</div><div class="obstacle-icon">${icon}</div>`;
+        world.appendChild(obs);
+        state.currentObstacle = obs;
+    }
+
+    function generateProblem() {
+        let prob;
+        let attempts = 0;
+        const maxAttempts = 15; // Don't try forever if the pool is small
+
+        // Try to generate a non-repeat question
+        do {
+            prob = createSingleProblem();
+            attempts++;
+        } while (state.history.includes(prob.text) && attempts < maxAttempts);
+
+        // Record history
+        state.history.push(prob.text);
+        if (state.history.length > 15) state.history.shift(); // Keep history size reasonable
+
+        return prob;
+    }
+
+    function createSingleProblem() {
+        const type = settings.ops[Math.floor(Math.random() * settings.ops.length)];
+        let a, b, ans;
+        if (type === '+') { a = Math.floor(Math.random() * settings.max) + 1; b = Math.floor(Math.random() * settings.max) + 1; return { type, text: `${a} + ${b}`, ans: a + b }; } 
+        else if (type === '-') { a = Math.floor(Math.random() * settings.max) + 1; b = Math.floor(Math.random() * a); return { type, text: `${a} - ${b}`, ans: a - b }; } 
+        else if (type === '*') { a = Math.floor(Math.random() * 5) + 1; b = Math.floor(Math.random() * 5) + 1; return { type, text: `${a} × ${b}`, ans: a * b }; } 
+        else { b = Math.floor(Math.random() * 4) + 1; ans = Math.floor(Math.random() * 5) + 1; return { type, text: `${ans * b} ÷ ${b}`, ans }; }
+    }
+
+    function triggerProblem(obs) {
+        state.paused = true;
+        obs.dataset.triggered = "true";
+        cat.innerText = "😼"; 
+        world.classList.add('solving');
+        questionEl.innerText = obs.dataset.q + " = ?";
+        state.input = ""; answerEl.innerText = "";
+        mathPanel.style.display = 'flex';
+    }
+
+    window.press = (n) => { 
+        if (state.input.length < 4) { 
+            state.input += n; 
+            answerEl.innerText = state.input; 
+        } 
+    };
+    window.backspace = () => { state.input = state.input.slice(0, -1); answerEl.innerText = state.input; };
+
+    window.submit = () => {
+        if (state.input === "" || !state.currentObstacle) return;
+        if (parseInt(state.input) === parseInt(state.currentObstacle.dataset.ans)) { handleCorrect(); } 
+        else { handleWrong(); }
+    };
+
+    function handleCorrect() {
+        state.score++;
+        scoreVal.innerText = state.score;
+        mathPanel.style.display = 'none';
+        world.classList.remove('solving');
+        
+        const obs = state.currentObstacle;
+        if(!obs) return;
+
+        const type = obs.dataset.type;
+        cat.innerText = "😸";
+
+        if (type === '+') { cat.style.bottom = '220px'; setTimeout(() => cat.style.bottom = '60px', 1200); } 
+        else if (type === '-') { cat.style.transform = 'scaleY(0.4)'; setTimeout(() => cat.style.transform = 'scaleY(1)', 1200); } 
+        else if (type === '*') { cat.style.bottom = '300px'; setTimeout(() => cat.style.bottom = '60px', 1500); } 
+        else if (type === '/') { cat.style.bottom = '10px'; setTimeout(() => cat.style.bottom = '60px', 1200); }
+
+        obs.style.transition = "right 1.5s ease-in";
+        obs.style.right = (window.innerWidth + 300) + 'px';
+
+        setTimeout(() => {
+            if(obs.parentNode) obs.remove();
+            state.currentObstacle = null;
+            state.paused = false;
+            cat.innerText = "🐱";
+            state.spawnTimer = setTimeout(spawnObstacle, 4000);
+        }, 1500);
+    }
+
+    function handleWrong() {
+        cat.innerText = "😿";
+        state.input = ""; answerEl.innerText = "";
+        answerEl.style.borderColor = "var(--error)";
+        setTimeout(() => { 
+            answerEl.style.borderColor = "#ddd"; 
+            if(state.paused) cat.innerText = "😼"; 
+        }, 800);
+    }
+
+    window.toggleSettings = (show) => { 
+        document.getElementById('settings-overlay').classList.toggle('hidden', !show); 
+        state.paused = show; 
+    };
+
+    window.saveAndReset = () => {
+        state.running = false;
+        if (state.spawnTimer) clearTimeout(state.spawnTimer);
+        toggleSettings(false);
+        startGame();
+    };
+
+    document.addEventListener('touchmove', (e) => { if (state.running) e.preventDefault(); }, { passive: false });
+</script>
+</body>
+</html>
