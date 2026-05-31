@@ -154,6 +154,38 @@
             pointer-events: auto;
         }
 
+        .treat-pop {
+            position: absolute;
+            left: calc(10% + 60px);
+            bottom: 175px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            color: var(--text);
+            border: 3px solid var(--primary);
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 22px;
+            font-weight: bold;
+            z-index: 60;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.12);
+            pointer-events: none;
+            animation: treat-pop 1.25s ease-out forwards;
+        }
+
+        .treat-emoji {
+            font-size: 34px;
+            line-height: 1;
+        }
+
+        @keyframes treat-pop {
+            0% { opacity: 0; transform: translateY(12px) scale(0.7); }
+            18% { opacity: 1; transform: translateY(0) scale(1.08); }
+            70% { opacity: 1; transform: translateY(-34px) scale(1); }
+            100% { opacity: 0; transform: translateY(-58px) scale(0.96); }
+        }
+
         #settings-btn {
             background: white;
             border: none;
@@ -281,7 +313,7 @@
 
 <div id="game-container">
     <div id="hud">
-        <div class="score-card">⭐ Stars: <span id="score-val">0</span></div>
+        <div class="score-card">🐟 Treats: <span id="score-val">0</span></div>
         <button id="settings-btn" onclick="toggleSettings(true)">⚙️</button>
     </div>
 
@@ -347,6 +379,13 @@
     };
 
     let settings = { ops: ['+','-'], max: 10 };
+    const treatRewards = [
+        { emoji: '🐟', label: 'Fish!' },
+        { emoji: '🍪', label: 'Cookie!' },
+        { emoji: '🧶', label: 'Yarn!' },
+        { emoji: '🥛', label: 'Milk!' },
+        { emoji: '👑', label: 'Crown!' }
+    ];
 
     const cat = document.getElementById('cat');
     const world = document.getElementById('world');
@@ -385,7 +424,7 @@
         cat.style.left = '10%';
         cat.innerText = '🐱';
         
-        document.querySelectorAll('.obstacle, .cloud, .bird, .grass-tuft').forEach(o => o.remove());
+        document.querySelectorAll('.obstacle, .cloud, .bird, .grass-tuft, .treat-pop').forEach(o => o.remove());
         
         settings.ops = [];
         if(document.getElementById('check-add').checked) settings.ops.push('+');
@@ -509,6 +548,15 @@
     };
     window.backspace = () => { state.input = state.input.slice(0, -1); answerEl.innerText = state.input; };
 
+    function showTreatReward() {
+        const reward = treatRewards[Math.floor(Math.random() * treatRewards.length)];
+        const pop = document.createElement('div');
+        pop.className = 'treat-pop';
+        pop.innerHTML = `<span class="treat-emoji">${reward.emoji}</span><span>${reward.label}</span>`;
+        world.appendChild(pop);
+        setTimeout(() => pop.remove(), 1300);
+    }
+
     window.submit = () => {
         if (state.input === "" || !state.currentObstacle) return;
         if (parseInt(state.input) === parseInt(state.currentObstacle.dataset.ans)) { handleCorrect(); } 
@@ -518,6 +566,7 @@
     function handleCorrect() {
         state.score++;
         scoreVal.innerText = state.score;
+        showTreatReward();
         mathPanel.style.display = 'none';
         world.classList.remove('solving');
         
